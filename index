@@ -1,1 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Celestial Viewer — Orion</title>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+<style>
+  :root{
+    --bg1:#0b1220;
+    --bg2:#071026;
+    --card:#0f1724cc;
+    --glass:#ffffff10;
+    --accent:#8ab4ff;
+    --muted:#9aa7b2;
+    --glass-blur:12px;
+  }
+
+  html,body{
+    height:100%;
+    margin:0;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    background: radial-gradient(1200px 600px at 10% 10%, rgba(138,180,255,0.06), transparent),
+                linear-gradient(180deg,var(--bg1),var(--bg2));
+    color:#e6eef8;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px;
+    box-sizing:border-box;
+  }
+
+  .viewer {
+    width:min(980px,96vw);
+    height:min(640px,86vh);
+    border-radius:20px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    box-shadow: 0 10px 30px rgba(2,6,23,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    padding:28px;
+    display:grid;
+    grid-template-columns: 1fr 320px;
+    gap:20px;
+    align-items:stretch;
+    overflow:hidden;
+  }
+
+  /* Left: sky */
+  .sky {
+    position:relative;
+    border-radius:14px;
+    overflow:hidden;
+    background:
+      radial-gradient(600px 300px at 80% 20%, rgba(255,255,255,0.02), transparent),
+      linear-gradient(180deg, rgba(10,18,30,0.6), rgba(3,8,18,0.6));
+    padding:18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  svg {
+    width:100%;
+    height:100%;
+    display:block;
+  }
+
+  /* Stars */
+  .star {
+    fill: #fff;
+    stroke: rgba(255,255,255,0.06);
+    transition: transform 180ms cubic-bezier(.2,.9,.3,1), filter 180ms;
+    transform-origin:center;
+    cursor:default;
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6));
+  }
+
+  .star:hover {
+    transform: scale(1.35);
+    filter: drop-shadow(0 12px 30px rgba(138,180,255,0.25));
+  }
+
+  .star-label {
+    font-size:12px;
+    fill:var(--muted);
+    pointer-events:none;
+    opacity:0;
+    transition:opacity 160ms;
+  }
+
+  .star:hover + .star-label {
+    opacity:1;
+  }
+
+  /* Constellation lines */
+  .conn {
+    stroke: rgba(138,180,255,0.18);
+    stroke-width:1.6;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+    transition: stroke 160ms;
+  }
+
+  /* Right: info panel */
+  .panel {
+    padding:18px;
+    border-radius:12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+
+  .panel h1 {
+    margin:0;
+    font-size:20px;
+    letter-spacing:-0.2px;
+  }
+
+  .panel p.lead {
+    margin:0;
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.45;
+  }
+
+  .legend {
+    margin-top:8px;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .legend .item {
+    display:flex;
+    gap:10px;
+    align-items:center;
+    padding:8px 10px;
+    border-radius:10px;
+    background: rgba(255,255,255,0.02);
+    cursor:default;
+    transition:background 160ms, transform 160ms;
+  }
+
+  .legend .item:hover {
+    background: rgba(138,180,255,0.06);
+    transform:translateY(-4px);
+  }
+
+  .dot {
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    background:var(--accent);
+    box-shadow: 0 6px 14px rgba(138,180,255,0.12);
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position:absolute;
+    pointer-events:none;
+    transform:translate(-50%,-120%);
+    background:linear-gradient(180deg, rgba(10,18,30,0.98), rgba(6,10,18,0.98));
+    color:#eaf4ff;
+    padding:8px 12px;
+    border-radius:10px;
+    font-size:13px;
+    box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+    opacity:0;
+    transition:opacity 120ms, transform 120ms;
+    white-space:nowrap;
+    z-index:30;
+  }
+
+  .tooltip.visible {
+    opacity:1;
+    transform:translate(-50%,-140%) scale(1);
+  }
+
+  .small {
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  /* Footer */
+  .footer {
+    margin-top:auto;
+    font-size:12px;
+    color:var(--muted);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+
+  @media (max-width:880px){
+    .viewer { grid-template-columns: 1fr; height:auto; padding:18px; gap:14px; }
+    .panel { order:2; }
+  }
+</style>
+</head>
+<body>
+  <div class="viewer" role="application" aria-label="Celestial viewer showing Orion constellation">
+    <div class="sky" id="sky">
+      <svg viewBox="0 0 1000 700" id="svgRoot" aria-hidden="false" role="img">
+        <!-- Constellation lines and stars will be injected by JS -->
+      </svg>
+
+      <div class="tooltip" id="tooltip" role="status" aria-live="polite"></div>
+    </div>
+
+    <aside class="panel" aria-label="Information panel">
+      <h1>Orion — Constellation Preview</h1>
+      <p class="lead">A compact viewer showing a few of Orion's principal stars. Hover any star to see a short description and magnitude hint.</p>
+
+      <div class="legend" id="legend"></div>
+
+      <div class="footer">
+        <div class="small">Data: curated positions for visual layout</div>
+        <div class="small">UI: Apple-like, smooth interactions</div>
+      </div>
+    </aside>
+  </div>
+
+<script>
+/*
+  Star data for Orion (approximate layout coordinates normalized to 0..1)
+  Positions are chosen to visually resemble Orion in the SVG viewBox.
+  Each star: { id, name, x, y, mag, desc }
+*/
+const stars = [
+  { id:'betelgeuse', name:'Betelgeuse', x:0.28, y:0.20, mag:0.5, desc:'Red supergiant; shoulder of Orion' },
+  { id:'bellatrix',  name:'Bellatrix',  x:0.46, y:0.18, mag:1.6, desc:'Blue giant; Orion\'s other shoulder' },
+  { id:'alnilam',    name:'Alnilam',    x:0.52, y:0.44, mag:1.7, desc:'Central star of Orion\'s Belt' },
+  { id:'alnitak',    name:'Alnitak',    x:0.40, y:0.50, mag:1.7, desc:'Leftmost star of the Belt' },
+  { id:'mintaka',    name:'Mintaka',    x:0.64, y:0.50, mag:2.2, desc:'Rightmost star of the Belt' },
+  { id:'saiph',      name:'Saiph',      x:0.36, y:0.78, mag:2.1, desc:'Knee of Orion' },
+  { id:'rigel',      name:'Rigel',      x:0.62, y:0.82, mag:0.1, desc:'Blue supergiant; Orion\'s foot' }
+];
+
+/* Pairs of star ids to draw connecting lines for the constellation shape */
+const connections = [
+  ['betelgeuse','bellatrix'],
+  ['betelgeuse','alnitak'],
+  ['bellatrix','mintaka'],
+  ['alnitak','alnilam'],
+  ['alnilam','mintaka'],
+  ['alnitak','saiph'],
+  ['mintaka','rigel'],
+  ['saiph','rigel']
+];
+
+const svg = document.getElementById('svgRoot');
+const tooltip = document.getElementById('tooltip');
+const legend = document.getElementById('legend');
+
+const viewW = 1000, viewH = 700;
+
+/* Utility: convert normalized coords to viewBox coords */
+function toXY(p){ return { x: Math.round(p.x * viewW), y: Math.round(p.y * viewH) }; }
+
+/* Draw connections first so they sit under stars */
+connections.forEach(pair=>{
+  const a = stars.find(s=>s.id===pair[0]);
+  const b = stars.find(s=>s.id===pair[1]);
+  if(!a||!b) return;
+  const A = toXY(a), B = toXY(b);
+  const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+  line.setAttribute('x1',A.x);
+  line.setAttribute('y1',A.y);
+  line.setAttribute('x2',B.x);
+  line.setAttribute('y2',B.y);
+  line.setAttribute('class','conn');
+  svg.appendChild(line);
+});
+
+/* Draw stars */
+stars.forEach(s=>{
+  const p = toXY(s);
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('transform',`translate(${p.x},${p.y})`);
+  g.setAttribute('data-id',s.id);
+  g.setAttribute('role','img');
+  g.setAttribute('aria-label',`${s.name}, magnitude ${s.mag}`);
+
+  // star circle (size inversely related to magnitude)
+  const size = Math.max(3, 10 - (s.mag || 1.5));
+  const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  circle.setAttribute('r', size);
+  circle.setAttribute('class','star');
+  circle.setAttribute('fill','white');
+  circle.setAttribute('stroke','rgba(255,255,255,0.06)');
+  circle.setAttribute('stroke-width','1');
+  g.appendChild(circle);
+
+  // subtle halo
+  const halo = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  halo.setAttribute('r', size*2.6);
+  halo.setAttribute('fill','none');
+  halo.setAttribute('stroke','rgba(138,180,255,0.06)');
+  halo.setAttribute('stroke-width','1');
+  halo.setAttribute('opacity','0.9');
+  g.insertBefore(halo, circle);
+
+  // invisible hit area for easier hover on small stars
+  const hit = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  hit.setAttribute('r', Math.max(14, size*3));
+  hit.setAttribute('fill','transparent');
+  hit.setAttribute('data-id',s.id);
+  hit.style.cursor = 'default';
+  g.appendChild(hit);
+
+  svg.appendChild(g);
+
+  // legend item
+  const item = document.createElement('div');
+  item.className = 'item';
+  item.innerHTML = `<div class="dot" aria-hidden="true"></div><div style="display:flex;flex-direction:column"><strong style="font-size:13px">${s.name}</strong><span class="small">${s.desc}</span></div>`;
+  legend.appendChild(item);
+
+  // hover handlers
+  const show = (clientX, clientY) => {
+    tooltip.innerHTML = `<strong style="display:block">${s.name}</strong><span class="small">Mag ${s.mag} — ${s.desc}</span>`;
+    // position relative to the sky container
+    const skyRect = document.getElementById('sky').getBoundingClientRect();
+    const svgRect = svg.getBoundingClientRect();
+    // compute tooltip position based on star center in viewport
+    const cx = svgRect.left + p.x * (svgRect.width / viewW);
+    const cy = svgRect.top + p.y * (svgRect.height / viewH);
+    tooltip.style.left = (cx - skyRect.left) + 'px';
+    tooltip.style.top = (cy - skyRect.top) + 'px';
+    tooltip.classList.add('visible');
+  };
+
+  const hide = () => {
+    tooltip.classList.remove('visible');
+  };
+
+  // attach to both the hit area and legend item for convenience
+  hit.addEventListener('mouseenter', (e)=> show(e.clientX, e.clientY));
+  hit.addEventListener('mousemove', (e)=> show(e.clientX, e.clientY));
+  hit.addEventListener('mouseleave', hide);
+
+  item.addEventListener('mouseenter', (e)=> show(e.clientX, e.clientY));
+  item.addEventListener('mouseleave', hide);
+});
+
+/* Click to gently pulse the star and show a longer info card (optional) */
+svg.addEventListener('click', (ev)=>{
+  const target = ev.target;
+  const gid = target.closest('g')?.dataset?.id;
+  if(!gid) return;
+  const g = svg.querySelector(`g[data-id="${gid}"]`);
+  if(!g) return;
+  g.animate([
+    { transform: g.getAttribute('transform') + ' scale(1)' },
+    { transform: g.getAttribute('transform') + ' scale(1.25)' },
+    { transform: g.getAttribute('transform') + ' scale(1)' }
+  ], { duration: 420, easing: 'cubic-bezier(.2,.9,.3,1)' });
+});
+
+/* Accessibility: hide tooltip on Escape */
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape') tooltip.classList.remove('visible');
+});
+</script>
+</body>
+</html>
 
